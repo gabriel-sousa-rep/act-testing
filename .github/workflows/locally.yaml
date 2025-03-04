@@ -1,15 +1,10 @@
 name: Deploy and Send Status to Slack
 
-on:
-  workflow_dispatch:
-    inputs:
-      skip_restart:
-        description: 'Set to true to skip the restart job'
-        required: false
-        default: 'false'
+on: push
+
 jobs:
   restart:
-    if: ${{ 'true ' != 'true' }}
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Simulate Restart
