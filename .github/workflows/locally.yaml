@@ -1,8 +1,12 @@
 name: Deploy and Send Status to Slack
 
 on:
-  workflow_dispatch: # Isso permite que o workflow seja executado manualmente, facilitando o teste com `act`
-
+  workflow_dispatch:
+    inputs:
+      skip_restart:
+        description: 'Set to true to skip the restart job'
+        required: false
+        default: 'false'
 jobs:
   restart:
     if: ${{ 'true ' != 'true' }}
