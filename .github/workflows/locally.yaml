@@ -11,15 +11,7 @@ jobs:
         run: echo "Restarting services..."
 
   sending-status-to-slack:
-    if: ${{ needs.get-environment.result == 'success' &&
-          needs.app-image-no-assets.result == 'success' &&
-          needs.app-image.result == 'success' &&
-          needs.assets.result == 'success' &&
-          needs.nginx-sidecar-image.result == 'success' &&
-          needs.ssr-image.result == 'success' &&
-          needs.helm-deployment.result == 'success' &&
-          needs.publish-schema-to-r-federation.result == 'success' &&
-          (needs.restart.result == 'success' || needs.restart.result == 'skipped') }}
+    if: needs.restart.result == 'success' || needs.restart.result == 'skipped'
     runs-on: ubuntu-latest
     needs:
       - restart
