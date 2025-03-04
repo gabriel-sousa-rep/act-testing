@@ -1,0 +1,37 @@
+name: Deploy and Send Status to Slack
+
+on:
+  workflow_dispatch: # Isso permite que o workflow seja executado manualmente, facilitando o teste com `act`
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simulate Restart
+        run: echo "Restarting services..."
+
+  sending-status-to-slack:
+    if: ${{ needs.get-environment.result == 'success' &&
+          needs.app-image-no-assets.result == 'success' &&
+          needs.app-image.result == 'success' &&
+          needs.assets.result == 'success' &&
+          needs.nginx-sidecar-image.result == 'success' &&
+          needs.ssr-image.result == 'success' &&
+          needs.helm-deployment.result == 'success' &&
+          needs.publish-schema-to-r-federation.result == 'success' &&
+          (needs.restart.result == 'success' || needs.restart.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    needs:
+      - get-environment
+      - app-image-no-assets
+      - app-image
+      - assets
+      - nginx-sidecar-image
+      - ssr-image
+      - helm-deployment
+      - publish-schema-to-r-federation
+      - restart
+    steps:
+      - name: Sending status to Slack
+        run: echo "Sending deployment status to Slack..."
+
