@@ -5,10 +5,11 @@ on:
 
 jobs:
   restart:
+    if: ${{ 'true ' != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Simulate Restart
-        run: echo "Restarting services..."; exit 1
+        run: echo "Restarting services..."
 
   sending-status-to-slack:
     if: needs.restart.result == 'success' || needs.restart.result == 'skipped'
