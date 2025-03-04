@@ -22,14 +22,6 @@ jobs:
           (needs.restart.result == 'success' || needs.restart.result == 'skipped') }}
     runs-on: ubuntu-latest
     needs:
-      - get-environment
-      - app-image-no-assets
-      - app-image
-      - assets
-      - nginx-sidecar-image
-      - ssr-image
-      - helm-deployment
-      - publish-schema-to-r-federation
       - restart
     steps:
       - name: Sending status to Slack
