@@ -1,21 +1,110 @@
-name: Deploy and Send Status to Slack
+name: Mock Deployment Workflow for Act
 
-on: push
+on:
+  push:  # Simplified trigger for local testing
+    branches:
+      - main
 
 jobs:
-  restart:
-    if: ${{ false }}
+  # Mock dependency jobs (simplified)
+  crossplane:
     runs-on: ubuntu-latest
     steps:
-      - name: Simulate Restart
-        run: echo "Restarting services..."
+      - name: Mock Crossplane Success
+        run: echo "Crossplane completed"
 
-  sending-status-to-slack:
-    if: needs.restart.result == 'success' || needs.restart.result == 'skipped'
+  helm-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock Helm Success
+        run: echo "Helm deployment completed"
+
+  get-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock Environment
+        run: echo "Environment fetched"
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock App
+        run: echo "App completed"
+
+  app-no-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock App No Assets
+        run: echo "App no assets completed"
+
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock Assets
+        run: echo "Assets completed"
+
+  nginx-sidecar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock Nginx Sidecar
+        run: echo "Nginx sidecar completed"
+
+  ssr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock SSR
+        run: echo "SSR completed"
+        # Uncomment below to simulate failure for testing
+        # run: exit 1
+
+  restart:
+    name: "🔄 Restart Deployment"
+    needs:
+      - get-environment
+      - crossplane
+      - app
+      - app-no-assets
+      - assets
+      - nginx-sidecar
+      - ssr
+      - helm-deployment
+    if: ${{ failure() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest  # Using ubuntu-latest for local testing
+    steps:
+      - name: Simulate Restart Attempt
+        id: restart
+        run: |
+          echo "Simulating restart for run ${{ github.run_id }}"
+          echo "Attempt number: ${{ github.run_attempt }}"
+          # Simulate success; change to 'exit 1' to test failure
+          echo "proceed=yes" >> $GITHUB_OUTPUT
+    outputs:
+      proceed: ${{ steps.restart.outputs.proceed }}
+
+  send-deployment-status-to-slack:
+    name: Notify Slack of Deployment Status
     runs-on: ubuntu-latest
     needs:
+      - crossplane
+      - helm-deployment
       - restart
+    env:
+      SLACK_BOT_TOKEN: "mock-token"  # Mock token for local testing
+      SLACK_CHANNEL_ID: "mock-channel"
     steps:
-      - name: Sending status to Slack
-        run: echo "Sending deployment status to Slack..."
+      - name: Notify Slack - Success
+        if: ${{ success() }}
+        run: |
+          echo "Would send SUCCESS to Slack:"
+          echo "Channel: $SLACK_CHANNEL_ID"
+          echo "Status: SUCCESS"
+          echo "Message: Deployment succeeded for ${{ github.repository }} - Commit ${{ github.sha }}"
 
+      - name: Notify Slack - Failure
+        if: ${{ failure() && needs.restart.outputs.proceed == 'no' }}
+        run: |
+          echo "Would send FAILURE to Slack:"
+          echo "Channel: $SLACK_CHANNEL_ID"
+          echo "Status: FAILED"
+          echo "Message: Deployment failed for ${{ github.repository }} - Commit ${{ github.sha }}"
+        continue-on-error: true
