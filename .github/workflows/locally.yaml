@@ -47,14 +47,12 @@ jobs:
     steps:
       - name: Mock Nginx Sidecar
         run: echo "Nginx sidecar completed"
-        run: exit 1
 
   ssr:
     runs-on: ubuntu-latest
     steps:
       - name: Mock SSR
         run: echo "SSR completed"
-        # run: exit 1
 
   restart:
     name: "🔄 Restart Deployment"
@@ -90,7 +88,6 @@ jobs:
       SLACK_CHANNEL_ID: "mock-channel"
     steps:
       - name: Notify Slack - Success
-        # Run if all required jobs succeed, regardless of restart status
         if: ${{ (needs.crossplane.result == 'success' && needs.helm-deployment.result == 'success') && (needs.restart.result == 'success' || needs.restart.result == 'skipped') }}
         run: |
           echo "Would send SUCCESS to Slack:"
@@ -99,7 +96,6 @@ jobs:
           echo "Message: Deployment succeeded for ${{ github.repository }} - Commit ${{ github.sha }}"
 
       - name: Notify Slack - Failure
-        # Run if there's a failure and restart didn't proceed
         if: ${{ failure() && (needs.restart.result == 'skipped' || needs.restart.outputs.proceed == 'no') }}
         run: |
           echo "Would send FAILURE to Slack:"
