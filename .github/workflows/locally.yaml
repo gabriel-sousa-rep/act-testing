@@ -1,12 +1,11 @@
 name: Mock Deployment Workflow for Act
 
 on:
-  push:  # Simplified trigger for local testing
+  push:
     branches:
       - main
 
 jobs:
-  # Mock dependency jobs (simplified)
   crossplane:
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +53,7 @@ jobs:
     steps:
       - name: Mock SSR
         run: echo "SSR completed"
-        # Uncomment below to simulate failure for testing
+        # Uncomment to simulate failure:
         # run: exit 1
 
   restart:
@@ -69,14 +68,13 @@ jobs:
       - ssr
       - helm-deployment
     if: ${{ failure() && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest  # Using ubuntu-latest for local testing
+    runs-on: ubuntu-latest
     steps:
       - name: Simulate Restart Attempt
         id: restart
         run: |
           echo "Simulating restart for run ${{ github.run_id }}"
           echo "Attempt number: ${{ github.run_attempt }}"
-          # Simulate success; change to 'exit 1' to test failure
           echo "proceed=yes" >> $GITHUB_OUTPUT
     outputs:
       proceed: ${{ steps.restart.outputs.proceed }}
@@ -89,11 +87,12 @@ jobs:
       - helm-deployment
       - restart
     env:
-      SLACK_BOT_TOKEN: "mock-token"  # Mock token for local testing
+      SLACK_BOT_TOKEN: "mock-token"
       SLACK_CHANNEL_ID: "mock-channel"
     steps:
       - name: Notify Slack - Success
-        if: ${{ success() }}
+        # Run if all required jobs succeed, regardless of restart status
+        if: ${{ (needs.crossplane.result == 'success' && needs.helm-deployment.result == 'success') && (needs.restart.result == 'success' || needs.restart.result == 'skipped') }}
         run: |
           echo "Would send SUCCESS to Slack:"
           echo "Channel: $SLACK_CHANNEL_ID"
@@ -101,7 +100,8 @@ jobs:
           echo "Message: Deployment succeeded for ${{ github.repository }} - Commit ${{ github.sha }}"
 
       - name: Notify Slack - Failure
-        if: ${{ failure() && needs.restart.outputs.proceed == 'no' }}
+        # Run if there's a failure and restart didn't proceed
+        if: ${{ failure() && (needs.restart.result == 'skipped' || needs.restart.outputs.proceed == 'no') }}
         run: |
           echo "Would send FAILURE to Slack:"
           echo "Channel: $SLACK_CHANNEL_ID"
