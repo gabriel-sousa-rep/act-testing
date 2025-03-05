@@ -47,6 +47,7 @@ jobs:
     steps:
       - name: Mock Nginx Sidecar
         run: echo "Nginx sidecar completed"
+        run: exit 1
 
   ssr:
     runs-on: ubuntu-latest
