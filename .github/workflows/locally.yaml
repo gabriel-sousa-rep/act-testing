@@ -53,8 +53,7 @@ jobs:
     steps:
       - name: Mock SSR
         run: echo "SSR completed"
-        # Uncomment to simulate failure:
-        # run: exit 1
+        run: exit 1
 
   restart:
     name: "🔄 Restart Deployment"
