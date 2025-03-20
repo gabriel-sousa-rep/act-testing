@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 0 * * *'  # Executa diariamente à meia-noite (ajuste conforme necessário)
   workflow_dispatch:
+    inputs:
+      HOSTED_ZONE_ID:
+        description: "ID da Hosted Zone do Route53"
+        required: false
+        default: "Z1234567890ABCDEFG"
 
 jobs:
   backup:
@@ -21,8 +26,8 @@ jobs:
 
       - name: Listar registros do Route53
         run: |
-          echo "Recuperando registros da Hosted Zone ${HOSTED_ZONE_ID}"
-          aws route53 list-resource-record-sets --hosted-zone-id ${{ secrets.HOSTED_ZONE_ID }} > records.json
+          echo "Recuperando registros da Hosted Zone ${{ github.event.inputs.HOSTED_ZONE_ID }}"
+          aws route53 list-resource-record-sets --hosted-zone-id ${{ github.event.inputs.HOSTED_ZONE_ID }} > records.json
 
       - name: Obter senha do Secrets Manager
         id: get_password
@@ -34,7 +39,7 @@ jobs:
       - name: Criar arquivo ZIP protegido por senha
         id: create_zip
         run: |
-          HOSTED_ZONE_NAME="${{ secrets.HOSTED_ZONE_NAME }}"
+          HOSTED_ZONE_NAME="${{ github.event.inputs.HOSTED_ZONE_ID }}"
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           FILENAME="${TIMESTAMP}_${HOSTED_ZONE_NAME}.zip"
           echo "Criando arquivo $FILENAME com proteção por senha..."
@@ -44,4 +49,4 @@ jobs:
       - name: Enviar arquivo para o bucket S3
         run: |
           echo "Enviando ${{ steps.create_zip.outputs.zipfile }} para o bucket S3..."
-          aws s3 cp "${{ steps.create_zip.outputs.zipfile }}" s3://${{ secrets.S3_BUCKET }}/
+          aws s3 cp "${{ steps.create_zip.outputs.zipfile }}" s3://r53-bucket-test-rep/
