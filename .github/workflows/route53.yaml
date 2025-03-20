@@ -1,0 +1,152 @@
+name: Route53 - Backup & Restore
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Runs daily at 1:00 UTC
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Operation to execute'
+        required: true
+        default: 'backup'
+        type: choice
+        options:
+          - backup
+          - restore
+      hosted_zone_id:
+        description: 'Route53 Hosted Zone ID'
+        required: true
+        default: 'Z2VDV81C0W9YSZ'
+      backup_file:
+        description: 'Specific backup file name (restore only)'
+        required: true
+      environment:
+        description: 'Environment (production or staging)'
+        required: true
+        default: 'production'
+      region:
+        description: 'AWS Region'
+        required: false
+        default: 'us-east-1'
+      local_only:
+        description: 'Extract backup without applying changes (restore only)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  route53_operations:
+    runs-on: ubuntu-latest
+    
+    env:
+      OPERATION: ${{ github.event_name == 'schedule' && 'backup' || github.event.inputs.operation }}
+      HOSTED_ZONE_ID: ${{ github.event.inputs.hosted_zone_id || 'Z2VDV81C0W9YSZ' }}
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
+      REGION: ${{ github.event.inputs.region || 'eu-west-1' }}
+      LOCAL_ONLY: ${{ github.event.inputs.local_only || false }}
+      BACKUP_FILE: ${{ github.event.inputs.backup_file }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-Route53Operations
+
+      - name: Get S3 bucket
+        id: s3-bucket
+        run: |
+          bucket=$(aws cloudformation list-exports \
+            --region ${{ env.REGION }} \
+            --output text \
+            --query "Exports[?Name == '${{ env.ENVIRONMENT }}-multi-cloud-backup-bucket'].Value")
+          echo "bucket=${bucket}" >> $GITHUB_OUTPUT
+
+      - name: Get encryption password
+        id: password
+        run: |
+          password=$(aws ssm get-parameter \
+            --region ${{ env.REGION }} \
+            --name "multi-cloud-native-dump-password" \
+            --with-decryption \
+            --output text \
+            --query 'Parameter.Value')
+          echo "::add-mask::${password}"
+          echo "value=${password}" >> $GITHUB_OUTPUT
+
+      - name: Generate backup file name
+        id: backup-file
+        if: ${{ env.OPERATION == 'backup' }}
+        run: echo "file_name=${HOSTED_ZONE_ID}-$(date '+%Y_%m_%d-%H')-backup.zip" >> $GITHUB_OUTPUT
+
+      - name: Export and encrypt Route53 records
+        if: ${{ env.OPERATION == 'backup' }}
+        run: |
+          aws route53 list-resource-record-sets --hosted-zone-id ${{ env.HOSTED_ZONE_ID }} | \
+          zip -e --password ${{ steps.password.outputs.value }} - > ${{ steps.backup-file.outputs.file_name }}
+
+      - name: Upload backup to S3
+        if: ${{ env.OPERATION == 'backup' }}
+        run: |
+          echo "Uploading encrypted backup to s3://${{ steps.s3-bucket.outputs.bucket }}/route53/"
+          aws s3 cp ${{ steps.backup-file.outputs.file_name }} \
+          s3://${{ steps.s3-bucket.outputs.bucket }}/route53/
+
+      # r53 restore    
+      - name: Find latest backup file
+        id: latest-backup
+        if: ${{ env.OPERATION == 'restore' && env.BACKUP_FILE == '' }}
+        run: |
+          backup_file=$(aws s3 ls s3://${{ steps.s3-bucket.outputs.bucket }}/route53/ | sort | tail -n 1 | awk '{print $4}')
+          if [[ -z "${backup_file}" ]]; then
+            echo "No backup files found in s3://${{ steps.s3-bucket.outputs.bucket }}/route53/"
+            exit 1
+          fi
+          echo "file=${backup_file}" >> $GITHUB_OUTPUT
+
+      - name: Set restore backup file name
+        id: restore-file
+        if: ${{ env.OPERATION == 'restore' }}
+        run: |
+          if [[ -n "${{ env.BACKUP_FILE }}" ]]; then
+            echo "file=${{ env.BACKUP_FILE }}" >> $GITHUB_OUTPUT
+          else
+            echo "file=${{ steps.latest-backup.outputs.file }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download and extract backup file
+        if: ${{ env.OPERATION == 'restore' }}
+        run: |
+          mkdir -p /tmp/route53_restore
+          aws s3 cp s3://${{ steps.s3-bucket.outputs.bucket }}/route53/${{ steps.restore-file.outputs.file }} \
+            /tmp/route53_restore/
+          cd /tmp/route53_restore
+          unzip -P ${{ steps.password.outputs.value }} ${{ steps.restore-file.outputs.file }}
+
+      - name: Display content (local only)
+        if: ${{ env.OPERATION == 'restore' && env.LOCAL_ONLY == 'true' }}
+        run: |
+          echo "File extracted to /tmp/route53_restore"
+          echo "Directory contents:"
+          ls -la /tmp/route53_restore
+          
+      - name: Create change batch and apply to Route53
+        if: ${{ env.OPERATION == 'restore' && env.LOCAL_ONLY != 'true' }}
+        run: |
+          cd /tmp/route53_restore
+          echo '{"Changes":[' > change-batch.json
+          cat resource-record-sets.json | jq -c '.ResourceRecordSets[] | select(.Type != "NS" and .Type != "SOA")' | while read -r record; do
+            echo "{\"Action\":\"CREATE\", \"ResourceRecordSet\":${record}}," >> change-batch.json
+          done
+          sed -i '$ s/,$//' change-batch.json
+          echo ']}' >> change-batch.json
+          
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id ${{ env.HOSTED_ZONE_ID }} \
+            --change-batch file:///tmp/route53_restore/change-batch.json
