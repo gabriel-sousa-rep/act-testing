@@ -69,12 +69,7 @@ jobs:
       - name: Get encryption password
         id: password
         run: |
-          password=$(aws ssm get-parameter \
-            --region ${{ env.REGION }} \
-            --name "multi-cloud-native-dump-password" \
-            --with-decryption \
-            --output text \
-            --query 'Parameter.Value')
+          password=test
           echo "::add-mask::${password}"
           echo "value=${password}" >> $GITHUB_OUTPUT
 
