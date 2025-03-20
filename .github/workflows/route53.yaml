@@ -33,7 +33,7 @@ jobs:
         id: get_password
         run: |
           echo "Recuperando senha do Secrets Manager..."
-          PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.SECRET_ID }} --query 'SecretString' --output text)
+          PASSWORD=enois
           echo "password=$PASSWORD" >> $GITHUB_OUTPUT
 
       - name: Criar arquivo ZIP protegido por senha
