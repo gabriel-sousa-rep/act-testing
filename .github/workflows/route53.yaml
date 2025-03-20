@@ -81,15 +81,12 @@ jobs:
       - name: Export and encrypt Route53 records
         if: ${{ env.OPERATION == 'backup' }}
         run: |
-          aws route53 list-resource-record-sets --hosted-zone-id ${{ env.HOSTED_ZONE_ID }} | \
-          zip -e --password ${{ steps.password.outputs.value }} - > ${{ steps.backup-file.outputs.file_name }}
-
-      - name: Upload backup to S3
-        if: ${{ env.OPERATION == 'backup' }}
-        run: |
+          aws route53 list-resource-record-sets --hosted-zone-id ${{ env.HOSTED_ZONE_ID }} > /tmp/route53-records.json
+          zip -e --password ${{ steps.password.outputs.value }} ${{ steps.backup-file.outputs.file_name }} /tmp/route53-records.json
           echo "Uploading encrypted backup to s3://${{ steps.s3-bucket.outputs.bucket }}/route53/"
           aws s3 cp ${{ steps.backup-file.outputs.file_name }} \
-          s3://${{ steps.s3-bucket.outputs.bucket }}/route53/
+          s3://${{ steps.s3-bucket.outputs.bucket }}/route53/ \
+          rm /tmp/route53-records.json
 
       # r53 restore    
       - name: Find latest backup file
