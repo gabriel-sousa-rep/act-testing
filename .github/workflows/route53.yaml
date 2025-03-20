@@ -19,7 +19,7 @@ on:
         default: 'Z2VDV81C0W9YSZ'
       backup_file:
         description: 'Specific backup file name (restore only)'
-        required: true
+        required: false
       environment:
         description: 'Environment (production or staging)'
         required: true
