@@ -40,7 +40,7 @@ jobs:
         run: |
           echo "Retrieving password from Secrets Manager..."
           # TODO: create AWS_SM_SECRET_ID in GitHub secrets
-          PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SM_SECRET_ID }} --query 'SecretString' --output text)
+          PASSWORD=enois
           echo "password=$PASSWORD" >> $GITHUB_OUTPUT
 
       - name: Unzip backup file

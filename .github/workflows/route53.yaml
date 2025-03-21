@@ -49,4 +49,4 @@ jobs:
       - name: Enviar arquivo para o bucket S3
         run: |
           echo "Enviando ${{ steps.create_zip.outputs.zipfile }} para o bucket S3..."
-          aws s3 cp "${{ steps.create_zip.outputs.zipfile }}" s3://r53-bucket-test-rep/
+          aws s3 cp "${{ steps.create_zip.outputs.zipfile }}" s3://${{ vars.ROUTE53_BACKUP_BUCKET }}/
