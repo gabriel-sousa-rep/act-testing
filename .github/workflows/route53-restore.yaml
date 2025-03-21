@@ -32,7 +32,7 @@ jobs:
       - name: Download backup file from S3
         run: |
           echo "Downloading file '${{ github.event.inputs.BACKUP_FILE }}' from bucket '${{ vars.ROUTE53_BACKUP_BUCKET }}'..."
-          aws s3 cp s3://${{ secrets.S3_BUCKET }}/${{ github.event.inputs.BACKUP_FILE }} .
+          aws s3 cp s3://${{ vars.ROUTE53_BACKUP_BUCKET }}/${{ github.event.inputs.BACKUP_FILE }} .
 
       - name: Get password from Secrets Manager
         id: get_password
