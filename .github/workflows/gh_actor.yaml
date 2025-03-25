@@ -12,7 +12,7 @@ on:
 jobs:
   check-user:
     name: Check user
-    runs-on: staging-github-runners
+    runs-on: ubuntu-latest
     outputs:
       is_allowed_user: ${{ steps.check_user.outputs.is_allowed_user }}
     steps:
@@ -33,7 +33,7 @@ jobs:
     name: 🧪 Test
     needs: check-user
     if: ${{ !(inputs.emergency && needs.check-user.outputs.is_allowed_user == 'true') || !inputs.emergency }}
-    runs-on: staging-github-runners
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
