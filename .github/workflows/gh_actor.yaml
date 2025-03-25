@@ -20,7 +20,7 @@ jobs:
         id: check_user
         run: |
           # Lista de usuários permitidos para skip CI
-          ALLOWED_USERS=("gabriel-sousa-rep")
+          ALLOWED_USERS=("gaiel-sousa-rep")
           CURRENT_USER="${{ github.actor }}"
 
           # Verifica se o usuário atual está na lista
