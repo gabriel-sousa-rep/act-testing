@@ -4,11 +4,18 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      skip_ci:
+        description: 'Skip Tests'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   check-actor:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name == 'master' && inputs.skip_ci == true }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_ci == true }}
     steps:
       - name: Fail if actor is not in allowed team
         run: |
@@ -25,3 +32,4 @@ jobs:
             echo "❌ User $ACTOR is not in team $TEAM_SLUG. Exiting..."
             exit 1
           fi
+          echo "✅ User $ACTOR is in team $TEAM_SLUG. Proceeding with skip..."
