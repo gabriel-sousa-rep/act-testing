@@ -1,35 +1,48 @@
-name: "Restricted CI/CD"
+name: 🧪 Test Mock
+
 on:
-  pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
-      skip_ci:
-        description: 'Skip Tests'
-        required: true
+      emergency:
+        description: 'Emergency mode - Skip CI for specific users'
+        required: false
         type: boolean
         default: false
 
 jobs:
-  check-actor:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_ci == true }}
+  check-user:
+    name: Check user
+    runs-on: staging-github-runners
+    outputs:
+      is_allowed_user: ${{ steps.check_user.outputs.is_allowed_user }}
     steps:
-      - name: Fail if actor is not in allowed team
+      - name: Check if user is allowed
+        id: check_user
         run: |
-          ACTOR="${{ github.actor }}"
-          ORG="your-org"
-          TEAM_SLUG="your-team"  # Team name (slug format, lowercase with dashes)
+          # Lista de usuários permitidos para skip CI
+          ALLOWED_USERS=("gabriel-sousa-rep")
 
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/orgs/$ORG/teams/$TEAM_SLUG/members/$ACTOR")
-
-          if [ "$RESPONSE" -ne 204 ]; then
-            echo "❌ User $ACTOR is not in team $TEAM_SLUG. Exiting..."
-            exit 1
+          # Verifica se o usuário atual está na lista
+          if [[ " ${ALLOWED_USERS[@]} " =~ " ${github.actor} " ]]; then
+            echo "is_allowed_user=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_allowed_user=false" >> $GITHUB_OUTPUT
           fi
-          echo "✅ User $ACTOR is in team $TEAM_SLUG. Proceeding with skip..."
+
+  test:
+    name: 🧪 Test
+    needs: check-user
+    if: ${{ !(inputs.emergency && needs.check-user.outputs.is_allowed_user == 'true') || !inputs.emergency }}
+    runs-on: staging-github-runners
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test
+        run: |
+          echo "Running tests..."
+          echo "User: ${{ github.actor }}"
+          echo "Emergency mode: ${{ inputs.emergency }}"
+          echo "Is allowed user: ${{ needs.check-user.outputs.is_allowed_user }}"
+          sleep 5 # Simula a execução dos testes
