@@ -1,50 +1,47 @@
-name: 🧪 Test Mock
+name: 🧪 Test Local
 
 on:
   workflow_dispatch:
     inputs:
       emergency:
-        description: 'Emergency mode - Skip CI for specific users'
+        description: 'Emergency mode - Skip CI for team members'
         required: false
         type: boolean
         default: false
 
 jobs:
-  check-user:
-    name: Check user
+  check-team:
+    name: Check Actor
     runs-on: ubuntu-latest
     outputs:
-      is_allowed_user: ${{ steps.check_user.outputs.is_allowed_user }}
+      is_team_member: ${{ steps.check_allowed.outputs.is_team_member }}
     steps:
-      - name: Check if user is allowed
-        id: check_user
-        run: |
-          # Lista de usuários permitidos para skip CI
-          ALLOWED_USERS=("gaiel-sousa-rep")
-          CURRENT_USER="${{ github.actor }}"
-
-          # Verifica se o usuário atual está na lista
-          if [[ " ${ALLOWED_USERS[@]} " =~ " ${CURRENT_USER} " ]]; then
-            echo "is_allowed_user=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_allowed_user=false" >> $GITHUB_OUTPUT
-          fi
+      - uses: actions/checkout@v4
+      - id: check_allowed
+        uses: ./.github/actions/check-team-member
+        with:
+          team: 'example'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     name: 🧪 Test
-    needs: check-user
-    if: ${{ !(inputs.emergency && needs.check-user.outputs.is_allowed_user == 'true') || !inputs.emergency }}
+    needs: check-team
+    if: ${{ !(inputs.emergency && needs.check-team.outputs.is_team_member == 'true') || !inputs.emergency }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Test
+      - name: Debug Info
         run: |
-          echo "Running tests..."
-          echo "User: ${{ github.actor }}"
+          echo "Current user: ${{ github.actor }}"
           echo "Emergency mode: ${{ inputs.emergency }}"
-          echo "Is allowed user: ${{ needs.check-user.outputs.is_allowed_user }}"
-          sleep 5 # Simula a execução dos testes
+          echo "Is team member: ${{ needs.check-team.outputs.is_team_member }}"
+          echo "Workflow will run: ${{ !(inputs.emergency && needs.check-team.outputs.is_team_member == 'true') || !inputs.emergency }}"
 
+      - name: Simulate Test
+        run: |
+          echo "Running test simulation..."
+          sleep 5
+          echo "Test completed successfully!"
