@@ -1,0 +1,27 @@
+name: "Restricted CI/CD"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-actor:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name == 'master' && inputs.skip_ci == true }}
+    steps:
+      - name: Fail if actor is not in allowed team
+        run: |
+          ACTOR="${{ github.actor }}"
+          ORG="your-org"
+          TEAM_SLUG="your-team"  # Team name (slug format, lowercase with dashes)
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$ORG/teams/$TEAM_SLUG/members/$ACTOR")
+
+          if [ "$RESPONSE" -ne 204 ]; then
+            echo "❌ User $ACTOR is not in team $TEAM_SLUG. Exiting..."
+            exit 1
+          fi
