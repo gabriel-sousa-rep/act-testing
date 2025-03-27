@@ -1,47 +1,99 @@
-name: 🧪 Test Local
-
+name: CI Test Mock
 on:
   workflow_dispatch:
     inputs:
       emergency:
-        description: 'Emergency mode - Skip CI for team members'
-        required: false
         type: boolean
+        description: Emergency Mode
+        required: true
+        default: false
+      mock_is_team_member:
+        type: boolean
+        description: Mock if user is team member
+        required: true
         default: false
 
 jobs:
-  check-team:
-    name: Check Actor
+  check-team-mock:
+    name: Check Actor Mock
+    if: ${{ inputs.emergency }}
     runs-on: ubuntu-latest
     outputs:
-      is_team_member: ${{ steps.check_allowed.outputs.is_team_member }}
+      is_team_member: ${{ inputs.mock_is_team_member }}
     steps:
-      - uses: actions/checkout@v4
-      - id: check_allowed
-        uses: ./.github/actions/check-team-member
-        with:
-          team: 'example'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Mock team check
+        run: |
+          echo "Mocking team check..."
+          echo "Emergency mode: ${{ inputs.emergency }}"
+          echo "Is team member: ${{ inputs.mock_is_team_member }}"
 
-  test:
-    name: 🧪 Test
-    needs: check-team
-    if: ${{ !(inputs.emergency && needs.check-team.outputs.is_team_member == 'true') || !inputs.emergency }}
+  dependencies-mock:
+    needs: check-team-mock
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - run: echo "Dependencies job always runs"
 
-      - name: Debug Info
-        run: |
-          echo "Current user: ${{ github.actor }}"
-          echo "Emergency mode: ${{ inputs.emergency }}"
-          echo "Is team member: ${{ needs.check-team.outputs.is_team_member }}"
-          echo "Workflow will run: ${{ !(inputs.emergency && needs.check-team.outputs.is_team_member == 'true') || !inputs.emergency }}"
+  test-mock:
+    needs: [dependencies-mock, check-team-mock]
+    if: ${{ !inputs.emergency || (inputs.emergency && needs.check-team-mock.outputs.is_team_member != 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Test job should run if not emergency OR (emergency AND not team member)"
 
-      - name: Simulate Test
+  e2e-tests-mock:
+    needs: [dependencies-mock, check-team-mock]
+    if: ${{ !inputs.emergency || (inputs.emergency && needs.check-team-mock.outputs.is_team_member != 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "E2E tests job should run if not emergency OR (emergency AND not team member)"
+
+  lint-mock:
+    needs: [dependencies-mock, check-team-mock]
+    if: ${{ !inputs.emergency || (inputs.emergency && needs.check-team-mock.outputs.is_team_member != 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Lint job should run if not emergency OR (emergency AND not team member)"
+
+  build-mock:
+    needs: [dependencies-mock]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Build job always runs after dependencies"
+
+  validation:
+    needs: [check-team-mock, dependencies-mock, test-mock, e2e-tests-mock, lint-mock, build-mock]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate workflow execution
         run: |
-          echo "Running test simulation..."
-          sleep 5
-          echo "Test completed successfully!"
+          echo "Workflow Summary:"
+          echo "----------------"
+          echo "Emergency Mode: ${{ inputs.emergency }}"
+          echo "Is Team Member: ${{ inputs.mock_is_team_member }}"
+          echo "----------------"
+          echo "Check Team: ${{ needs.check-team-mock.result }}"
+          echo "Dependencies: ${{ needs.dependencies-mock.result }}"
+          echo "Test: ${{ needs.test-mock.result }}"
+          echo "E2E Tests: ${{ needs.e2e-tests-mock.result }}"
+          echo "Lint: ${{ needs.lint-mock.result }}"
+          echo "Build: ${{ needs.build-mock.result }}"
+
+          # Validate expected behavior
+          if [[ "${{ inputs.emergency }}" == "true" && "${{ inputs.mock_is_team_member }}" == "true" ]]; then
+            # Emergency + Team Member: test, e2e, lint should be skipped
+            if [[ "${{ needs.test-mock.result }}" != "skipped" || \
+                  "${{ needs.e2e-tests-mock.result }}" != "skipped" || \
+                  "${{ needs.lint-mock.result }}" != "skipped" ]]; then
+              echo "Error: Test, E2E, and Lint jobs should be skipped in emergency mode for team members"
+              exit 1
+            fi
+          elif [[ "${{ inputs.emergency }}" == "false" ]]; then
+            # Non-emergency: all jobs should run
+            if [[ "${{ needs.test-mock.result }}" != "success" || \
+                  "${{ needs.e2e-tests-mock.result }}" != "success" || \
+                  "${{ needs.lint-mock.result }}" != "success" ]]; then
+              echo "Error: All jobs should run in non-emergency mode"
+              exit 1
+            fi
+          fi
