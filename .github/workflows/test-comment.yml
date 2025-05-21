@@ -1,0 +1,21 @@
+name: Test Update Comment
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  comment-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or Update PR Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            🚨 Deployment failed!  
+            Check [GitHub Action logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).  
+            <!-- deployment-comment -->
+          edit-mode: replace
+          body-includes: '<!-- deployment-comment -->'
